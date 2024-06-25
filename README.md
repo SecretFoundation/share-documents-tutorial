@@ -1,1 +1,1 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-wagmi`](https://github.com/wevm/wagmi/tree/main/packages/create-wagmi).
+See [here](https://docs.scrt.network/secret-network-documentation/confidential-computing-layer/ethereum-evm-developer-toolkit/usecases/confidential-document-sharing) for Confidential Document Sharing documentation on Secret Network :D 

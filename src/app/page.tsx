@@ -1,7 +1,7 @@
 'use client'
 
 import { useAccount, useConnect, useDisconnect, useWalletClient } from 'wagmi'
-import { Config, SecretDocumentClient, Environment, MetaMaskWallet } from "@secret-network/share-document";
+import { Config, SecretDocumentClient, Environment, MetaMaskWallet, PinataStorage } from "@secret-network/share-document";
 import { useEffect, useState } from 'react';
 
 function App() {
@@ -11,6 +11,7 @@ function App() {
   const { data: walletClient } = useWalletClient();
   const [client, setClient] = useState<SecretDocumentClient>();
   const [fileId, setFileId] = useState('');
+  const [secretAddress, setSecretAddress] = useState('');
 
   // Initialize user wallet for the SDK
   useEffect(() => {
@@ -23,6 +24,13 @@ function App() {
 
       const wallet = await MetaMaskWallet.create(window.ethereum, address || "");
       config.useSecretWallet(wallet);
+
+      const gateway = "https://gateway.pinata.cloud";
+      const accessToken = "your-access-token";
+      
+      const pinataStorage = new PinataStorage(gateway, accessToken);
+      config.useStorage(pinataStorage);
+
       const secretClient = new SecretDocumentClient(config);
       setClient(secretClient);
       console.log("client: ", secretClient);
@@ -67,16 +75,67 @@ function App() {
       return;
     }
     try {
-      const res = await client.viewDocument().download(fileId);
-      console.log('File downloaded successfully:', res);
+      const uint8Array = await client.viewDocument().download(fileId);
+
+      // Convert Uint8Array to Blob
+      const blob = new Blob([uint8Array], { type: 'application/octet-stream' });
+
+      // Create a link element
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'downloaded_file'; // Set the desired file name here
+
+      // Append the link to the body
+      document.body.appendChild(link);
+
+      // Programmatically click the link to trigger the download
+      link.click();
+
+      // Remove the link from the document
+      document.body.removeChild(link);
+
+      console.log('File downloaded successfully');
     } catch (error) {
       console.error('Error downloading file:', error);
     }
   };
 
   // Share file
-  const shareFile = async () => {
-    // Share file logic here
+  const shareFile = async (fileId: string, secretAddress: string) => {
+    if (!client) {
+      console.error('Client is not initialized');
+      return;
+    }
+    try {
+      const shareDocument = client.shareDocument(fileId);
+
+      // Get existing file access
+      const fileAccess = await shareDocument.getFileAccess();
+      console.log('Existing file access:', fileAccess);
+
+      // Share viewing access to a file
+      const addViewingRes = await shareDocument.addViewing([secretAddress]);
+      console.log('Viewing access added:', addViewingRes);
+
+      // Delete viewing access to a file
+      // const deleteViewingRes = await shareDocument.deleteViewing([secretAddress]);
+      // console.log('Viewing access deleted:', deleteViewingRes);
+
+      // Transfer the ownership
+      // const changeOwnerRes = await shareDocument.changeOwner(secretAddress);
+      // console.log('Ownership transferred:', changeOwnerRes);
+
+      // All in one share operation
+      const shareRes = await shareDocument.share({
+        // changeOwner: secretAddress,
+        addViewing: [secretAddress],
+        // deleteViewing: [secretAddress],
+      });
+      console.log('All-in-one share operation completed:', shareRes);
+
+    } catch (error) {
+      console.error('Error sharing file:', error);
+    }
   };
 
   return (
@@ -119,7 +178,19 @@ function App() {
       </div>
       <div>
         <h2>Share File</h2>
-        <button onClick={shareFile}>Share File</button>
+        <input
+          type="text"
+          value={fileId}
+          onChange={(e) => setFileId(e.target.value)}
+          placeholder="Enter file ID"
+        />
+        <input
+          type="text"
+          value={secretAddress}
+          onChange={(e) => setSecretAddress(e.target.value)}
+          placeholder="Enter secret address"
+        />
+        <button onClick={() => shareFile(fileId, secretAddress)}>Share File</button>
       </div>
     </>
   );
